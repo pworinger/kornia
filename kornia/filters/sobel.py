@@ -65,7 +65,8 @@ def spatial_gradient(input: torch.Tensor,
 
 def spatial_gradient3d(input: torch.Tensor,
                        mode: str = 'diff',
-                       order: int = 1) -> torch.Tensor:
+                       order: int = 1,
+                       normalized: bool = True) -> torch.Tensor:
     r"""Computes the first and second order volume derivative in x, y and d using a diff
     operator.
 
@@ -96,6 +97,8 @@ def spatial_gradient3d(input: torch.Tensor,
                          .format(input.shape))
     # allocate kernel
     kernel: torch.Tensor = get_spatial_gradient_kernel3d(mode, order)
+    if normalized:
+        kernel = normalize_kernel3d(kernel)
 
     # prepare kernel
     b, c, d, h, w = input.shape
@@ -153,6 +156,44 @@ def sobel(input: torch.Tensor, normalized: bool = True, eps: float = 1e-6) -> to
 
     # compute gradient maginitude
     magnitude: torch.Tensor = torch.sqrt(gx * gx + gy * gy + eps)
+
+    return magnitude
+
+def sobel3d(input: torch.Tensor, normalized: bool = True, eps: float = 1e-6) -> torch.Tensor:
+    r"""Computes the Sobel operator and returns the magnitude per channel.
+
+    Args:
+        input (torch.Tensor): the input image with shape :math:`(B,C,D,H,W)`.
+        normalized (bool): if True, L1 norm of the kernel is set to 1.
+        eps (float): regularization number to avoid NaN during backprop. Default: 1e-6.
+
+    Return:
+        torch.Tensor: the sobel edge gradient magnitudes map with shape :math:``(B,C,D,H,W)``.
+
+    Example:
+        >>> input = torch.rand(1, 3, 4, 4, 4)
+        >>> output = sobel(input)  # 1x3x4x4x4
+        >>> output.shape
+        torch.Size([1, 3, 4, 4, 4])
+    """
+    if not isinstance(input, torch.Tensor):
+        raise TypeError("Input type is not a torch.Tensor. Got {}"
+                        .format(type(input)))
+
+    if not len(input.shape) == 5:
+        raise ValueError("Invalid input shape, we expect BxCxDxHxW. Got: {}"
+                         .format(input.shape))
+
+    # compute the x/y/z gradients
+    edges: torch.Tensor = spatial_gradient3d(input, mode="sobel", order=1, normalized=normalized)
+
+    # unpack the edges
+    gx: torch.Tensor = edges[:, :, 0]
+    gy: torch.Tensor = edges[:, :, 1]
+    gz: torch.Tensor = edges[:, :, 2]
+
+    # compute gradient magnitude
+    magnitude: torch.Tensor = torch.sqrt(gx * gx + gy * gy + gz * gz + eps)
 
     return magnitude
 

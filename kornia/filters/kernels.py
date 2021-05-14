@@ -16,6 +16,15 @@ def normalize_kernel2d(input: torch.Tensor) -> torch.Tensor:
     norm: torch.Tensor = input.abs().sum(dim=-1).sum(dim=-1)
     return input / (norm.unsqueeze(-1).unsqueeze(-1))
 
+def normalize_kernel3d(input: torch.Tensor) -> torch.Tensor:
+    r"""Normalizes both derivative and smoothing kernel.
+    """
+    if len(input.size()) < 3:
+        raise TypeError("input should be at least 3D tensor. Got {}"
+                        .format(input.size()))
+    norm: torch.Tensor = input.abs().sum(dim=-1).sum(dim=-1).sum(dim=-1)
+    return input / (norm.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1))
+
 
 def gaussian(window_size: int, sigma: float) -> torch.Tensor:
     device, dtype = None, None
@@ -233,6 +242,47 @@ def get_diff_kernel3d(device=torch.device('cpu'), dtype=torch.float) -> torch.Te
                                          ], device=device, dtype=dtype)
     return kernel.unsqueeze(1)
 
+def get_sobel_kernel3d(device=torch.device('cpu'), dtype=torch.float) -> torch.Tensor:
+    """Utility function that returns a first order sobel kernel of 3x3x3"""
+    kernel: torch.Tensor = torch.tensor([[[[-1.0, 0.0, 1.0],
+                                           [-2.0, 0.0, 2.0],
+                                           [-1.0, 0.0, 1.0]],
+
+                                          [[-2.0, 0.0, 2.0],
+                                           [-4.0, 0.0, 4.0],
+                                           [-2.0, 0.0, 2.0]],
+
+                                          [[-1.0, 0.0, 1.0],
+                                           [-2.0, 0.0, 2.0],
+                                           [-1.0, 0.0, 1.0]],
+                                          ],
+                                         [[[-1.0, -2.0, -1.0],
+                                           [0.0, 0.0, 0.0],
+                                           [1.0, 2.0, 1.0]],
+
+                                          [[-2.0, -4.0, -2.0],
+                                           [0.0, 0.0, 0.0],
+                                           [2.0, 4.0, 2.0]],
+
+                                          [[-1.0, -2.0, -1.0],
+                                           [0.0, 0.0, 0.0],
+                                           [1.0, 2.0, 1.0]],
+                                          ],
+                                         [[[-1.0, -2.0, -1.0],
+                                           [-2.0, -4.0, -2.0],
+                                           [-1.0, -2.0, -1.0]],
+
+                                          [[0.0, 0.0, 0.0],
+                                           [0.0, 0.0, 0.0],
+                                           [0.0, 0.0, 0.0]],
+
+                                          [[1.0, 2.0, 1.0],
+                                           [2.0, 4.0, 2.0],
+                                           [1.0, 2.0, 1.0]],
+                                          ],
+                                         ], device=device, dtype=dtype)
+    return kernel.unsqueeze(1)
+
 
 def get_diff_kernel3d_2nd_order(device=torch.device('cpu'), dtype=torch.float) -> torch.Tensor:
     """Utility function that returns a first order derivative kernel of 3x3x3"""
@@ -377,8 +427,10 @@ def get_spatial_gradient_kernel3d(mode: str, order: int, device=torch.device('cp
     if order not in [1, 2]:
         raise TypeError("order should be either 1 or 2\
                          Got {}".format(order))
-    if mode == 'sobel':
-        raise NotImplementedError("Sobel kernel for 3d gradient is not implemented yet")
+    if mode == 'sobel' and order == 2:
+        raise NotImplementedError("Sobel kernel for 3d 2nd order gradient is not implemented yet")
+    elif mode == 'sobel' and order == 1:
+        kernel = get_sobel_kernel3d(device, dtype)
     elif mode == 'diff' and order == 1:
         kernel = get_diff_kernel3d(device, dtype)
     elif mode == 'diff' and order == 2:
